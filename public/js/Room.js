@@ -1977,6 +1977,7 @@ function startSessionTimer() {
     const sessionTime = document.getElementById('sessionTime');
     const chatSessionTime = document.getElementById('chatSessionTime');
     const settingsSessionTime = document.getElementById('settingsSessionTime');
+    const sessionTimeDisplay = document.getElementById('sessionTimeDisplay');
     
     if (sessionTime) sessionTime.style.display = 'inline';
     
@@ -1991,6 +1992,7 @@ function startSessionTimer() {
         if (sessionTime) sessionTime.innerText = timeString;
         if (chatSessionTime) chatSessionTime.innerText = timeString;
         if (settingsSessionTime) settingsSessionTime.innerText = timeString;
+        if (sessionTimeDisplay) sessionTimeDisplay.innerText = timeString;
         
         const myCurrentSessionTime = document.querySelector('.current-session-time.notranslate');
         if (myCurrentSessionTime) myCurrentSessionTime.innerText = secondsToHms(callElapsedSecondsTime);
