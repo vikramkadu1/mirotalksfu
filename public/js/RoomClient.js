@@ -5884,7 +5884,7 @@ class RoomClient {
     toggleChatHistorySize(max = true) {
         const chatHistory = this.getId('chatHistory');
         chatHistory.style.minHeight = max ? 'calc(100vh - 270px)' : '430px';
-        chatHistory.style.maxHeight = max ? 'calc(100vh - 270px)' : '430px';
+        chatHistory.style.maxHeight = max ? 'calc(100vh - 170px)' : '430px';
     }
 
     toggleChatPin() {
