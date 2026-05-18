@@ -1814,7 +1814,7 @@ access to use this app.
             <!-- CHAT APP -->
             <div id="chatApp" class="chat-app">
                 <!-- CHAT PEOPLE LIST -->
-                <div id="plist" class="people-list">
+                <div id="plist" class="people-list hidden">
                     <!-- CHAT LIST OPTIONS -->
                     <div class="chat-list-actions">
                         <button id="chatShareRoomBtn"><i class="fas fa-user-plus"></i> Invite</button>
@@ -1847,7 +1847,7 @@ access to use this app.
                     </div>
 
                     <!-- CHAT CONVERSATIONS COUNT -->
-                    <div id="chatConversationsCount" class="chat-conversations-count"></div>
+                    <div id="chatConversationsCount" class="chat-conversations-count hidden"></div>
                     <!-- CHAT LIST -->
                     <ul id="participantsList" class="list-unstyled chat-list mt-2 mb-0"></ul>
                 </div>
@@ -1953,9 +1953,7 @@ access to use this app.
                         <div id="chatEmptyNotice" class="empty-chat-notice">
                             <img alt="Empty chat illustration" class="empty-chat-img" src="../svg/emptyChat.svg" />
                             <h5 class="empty-chat-title">Start Conversation</h5>
-                            <p class="empty-chat-desc">
-                                There are no messages here yet. Start a conversation by sending a message.
-                            </p>
+                           
                         </div>
 
                         <!-- CHAT MESSAGES -->
@@ -2763,7 +2761,7 @@ Note</textarea
 
         <template id="participantListActionButtonsTemplate">
             <br />
-            <div class="about-buttons mt5" data-template-html="buttons"></div>
+            <div class="about-buttons hidden mt5" data-template-html="buttons"></div>
         </template>
 
         <!-- Utility Templates -->

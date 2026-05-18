@@ -6446,28 +6446,7 @@ class RoomClient {
                 <div class="message ${messageClass}">
                     <span class="text-start" id="message-${chatMessagesId}"></span>
                     <div class="message-reactions"></div>
-                    <hr/>
-                    <div class="about-buttons mt5">
-                        <button 
-                            id="msg-copy-${chatMessagesId}" 
-                            class="mr5" 
-                            onclick="rc.copyToClipboard('message-${chatMessagesId}')">
-                            ${icons.paste}
-                        </button>
-                        ${speechButton}
-                        <button 
-                            id="msg-react-${chatMessagesId}" 
-                            class="mr5" 
-                            onclick="rc.toggleReactionPicker('msg-${chatMessagesId}')">
-                            ${icons.smile}
-                        </button>
-                        <button 
-                            id="msg-delete-${chatMessagesId}"   
-                            class="mr5" 
-                            onclick="rc.deleteMessage('msg-${chatMessagesId}')">
-                            ${icons.trash}
-                        </button>
-                    </div>
+                    
                     <div id="reaction-picker-${chatMessagesId}" class="reaction-picker" style="display:none">
                         ${reactionButtons}
                     </div>
