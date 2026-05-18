@@ -446,7 +446,7 @@ body {
 --------------------------------------------------------------*/
 
 #bottomButtons {
-    z-index: 3;
+    z-index: 1001;
     position: fixed;
     display: none;
     padding: 5px;
@@ -461,7 +461,8 @@ body {
     gap: 0.5rem;
     border-radius: 14px;
     border: none !important;
-    /* box-shadow: var(--box-shadow); */
+    box-shadow: var(--box-shadow);
+    background: var(--btns-bg-color);
 }
 
 /* Split button (main action + device arrow) */
