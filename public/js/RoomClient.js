@@ -3829,7 +3829,7 @@ class RoomClient {
 
         vb = document.createElement('div');
         vb.id = peer_id + '__vb';
-        vb.className = 'videoMenuBar hidden';
+        vb.className = 'videoMenuBar';
 
         au = this.createButton(peer_id + '__audio', peer_audio ? html.audioOn : html.audioOff);
 
@@ -5611,24 +5611,17 @@ class RoomClient {
         const chatRoom = this.getId('chatRoom');
         chatRoom.classList.toggle('show');
         if (!this.isChatOpen) {
-            await getRoomParticipants();
             hide(chatMinButton);
-
             if (!this.isMobileDevice) {
                 BUTTONS.chat.chatMaxButton && show(chatMaxButton);
             }
             this.chatCenter();
             this.sound('open');
-            this.showPeerAboutAndMessages(this.chatPeerId, this.chatPeerName, this.chatPeerAvatar);
+            // Always show public chat immediately
+            this.showPeerAboutAndMessages('all', 'all');
         }
-        isParticipantsListOpen = !isParticipantsListOpen;
+        
         this.isChatOpen = !this.isChatOpen;
-
-        if (this.isChatPinned) this.chatUnpin();
-
-        if (!this.isMobileDevice && this.isChatOpen && this.canBePinned() && isChatPinEnabled) {
-            this.toggleChatPin();
-        }
 
         resizeChatRoom();
     }
@@ -5717,9 +5710,6 @@ class RoomClient {
         hide(chatMaxButton);
         BUTTONS.chat.chatMaxButton && show(chatMinButton);
         this.chatCenter();
-        document.documentElement.style.setProperty('--msger-width', '100%');
-        document.documentElement.style.setProperty('--msger-height', '100%');
-        this.toggleChatHistorySize(true);
     }
 
     chatMinimize() {
@@ -5730,9 +5720,6 @@ class RoomClient {
             this.chatPin();
         } else {
             this.chatCenter();
-            document.documentElement.style.setProperty('--msger-width', '800px');
-            document.documentElement.style.setProperty('--msger-height', '700px');
-            this.toggleChatHistorySize(false);
         }
     }
 
@@ -5752,7 +5739,6 @@ class RoomClient {
         this.resizeVideoMenuBar();
         resizeVideoMedia();
         chatRoom.style.resize = 'none';
-        if (!this.isMobileDevice) this.makeUnDraggable(chatRoom, chatHeader);
         if (this.isPlistOpen()) this.toggleShowParticipants();
         if (chatRoom.classList.contains('container')) chatRoom.classList.remove('container');
     }
@@ -5761,8 +5747,6 @@ class RoomClient {
         if (!this.isVideoPinned) {
             this.videoMediaContainerUnpin();
         }
-        document.documentElement.style.setProperty('--msger-width', '800px');
-        document.documentElement.style.setProperty('--msger-height', '700px');
         hide(chatMinButton);
         BUTTONS.chat.chatMaxButton && show(chatMaxButton);
         this.chatCenter();
@@ -5770,7 +5754,6 @@ class RoomClient {
         setColor(chatTogglePin, 'white');
         this.resizeVideoMenuBar();
         resizeVideoMedia();
-        if (!this.isMobileDevice) this.makeDraggable(chatRoom, chatHeader);
         if (!this.isPlistOpen()) this.toggleShowParticipants();
         if (!chatRoom.classList.contains('container')) chatRoom.classList.add('container');
         resizeChatRoom();
@@ -5778,19 +5761,22 @@ class RoomClient {
 
     chatCenter() {
         chatRoom.style.position = 'fixed';
-        chatRoom.style.transform = 'translate(-50%, -50%)';
-        chatRoom.style.top = '50%';
-        chatRoom.style.left = '50%';
+        chatRoom.style.transform = 'none';
+        chatRoom.style.top = '0';
+        chatRoom.style.right = '0';
+        chatRoom.style.left = 'auto';
+        chatRoom.style.width = '50vw';
+        chatRoom.style.height = '100vh';
     }
 
     chatPinned() {
-        chatRoom.style.position = 'absolute';
-        chatRoom.style.top = 0;
-        chatRoom.style.right = 0;
-        chatRoom.style.left = null;
-        chatRoom.style.transform = null;
-        document.documentElement.style.setProperty('--msger-width', '25%');
-        document.documentElement.style.setProperty('--msger-height', '100%');
+        chatRoom.style.position = 'fixed';
+        chatRoom.style.top = '0';
+        chatRoom.style.right = '0';
+        chatRoom.style.left = 'auto';
+        chatRoom.style.transform = 'none';
+        chatRoom.style.width = '50vw';
+        chatRoom.style.height = '100vh';
     }
 
     toggleChatEmoji() {
