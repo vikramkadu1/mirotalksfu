@@ -7,22 +7,41 @@
     overflow-x: hidden; */
 }
 
+/* Always anchor chat to the right side */
+.chat-container {
+    right: 0 !important;
+    left: auto !important;
+    top: 0 !important;
+    transform: none !important;
+    width: 50vw !important;
+    min-width: 320px !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    border-radius: 14px 0 0 14px !important;
+    resize: none !important;
+}
+
 /* Chat Room */
 .chat-container {
     z-index: 5;
-    position: relative;
-    width: var(--msger-width);
-    height: var(--msger-height);
-    min-width: var(--msger-width);
-    min-height: var(--msger-height);
+    position: fixed;
+    right: 0;
+    left: auto;
+    top: 0;
+    transform: none;
+    width: 50vw;
+    min-width: 320px;
+    height: 100vh;
+    min-height: 100vh;
     padding: 3px;
     background: var(--msger-bg);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
+    border-right: none;
+    border-radius: 14px 0 0 14px;
     box-shadow: var(--box-shadow);
     transition:
-        background 1s,
-        width 0.5s ease-in-out;
+        background 1s;
+    resize: none;
     /* border: 1px solid lime; */
 }
 
@@ -37,20 +56,9 @@
     /* border: 1px solid lime; */
 }
 
-/* Chat app people container */
+/* Chat app people container — hidden, public chat only */
 .chat-app .people-list {
-    z-index: 6;
-    position: absolute;
-    padding: 20px;
-    top: 0;
-    left: 0;
-    width: 300px;
-    height: 99%;
-    background: var(--msger-bg);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    /* border: 1px solid lime; */
+    /* display: none !important; */
 }
 
 /* Keep header elements pinned at top */
@@ -64,15 +72,36 @@
     overflow-x: hidden;
     flex: 1;
     min-height: 0;
-    padding: 6px 4px;
+    padding: 4px 6px;
+}
+
+/* Conversations header */
+.chat-conversations-header {
+    margin-bottom: 12px;
+}
+
+.chat-conversations-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 2px;
+}
+
+.chat-conversations-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
 }
 
 /* Conversations count */
 .chat-conversations-count {
     font-size: 12px;
     color: rgba(255, 255, 255, 0.45);
-    margin-top: 14px;
-    margin-bottom: 4px;
+    margin-top: 12px;
     padding-left: 2px;
 }
 
@@ -113,71 +142,37 @@
     /* border: 1px solid lime; */
 }
 
-/* Chat list actions bar */
-.chat-list-actions {
+.people-list > div:first-child {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
+    justify-content: space-between;
+    flex-wrap: nowrap;
 }
 
-.chat-list-actions #chatShareRoomBtn {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 9px 14px;
-    border: none;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: 'Montserrat', sans-serif;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    white-space: nowrap;
-    min-height: 36px;
-    flex-shrink: 0;
-}
-
-.chat-list-actions #chatShareRoomBtn:hover {
-    background: rgba(255, 255, 255, 0.14);
-    transform: none;
-}
-
-.chat-action-icon-btns {
-    display: flex;
-    gap: 4px;
-    margin-left: auto;
-}
-
-.chat-action-icon-btns button {
+.people-list > div:first-child button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background 0.2s ease;
+    gap: 8px;
+    min-height: 38px;
+    line-height: 1;
+}
+
+.people-list > div:first-child button i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.people-list > div:first-child #chatShareRoomBtn {
+    margin-right: auto;
+}
+
+.people-list > div:first-child button:not(#chatShareRoomBtn) {
+    flex: 0 0 38px;
+    width: 38px;
     padding: 0;
-    flex-shrink: 0;
-}
-
-.chat-action-icon-btns button:hover {
-    background: rgba(255, 255, 255, 0.16);
-}
-
-.chat-action-icon-btns #chatHideParticipantsList {
-    background: #1e3a8a;
-}
-
-.chat-action-icon-btns #chatHideParticipantsList:hover {
-    background: #1d4ed8;
 }
 
 .people-list .chat-list > li {
@@ -266,28 +261,47 @@
     /* border: 1px solid lime; */
 }
 
-/* Chat app container */
+/* Chat app container — full width, no left margin */
 .chat-app .chat {
     position: relative;
     display: flex;
     flex-direction: column;
-    margin-left: 300px;
+    margin-left: 0 !important;
     height: 100%;
     overflow: hidden;
-    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: none !important;
     /* border: 1px solid lime; */
 }
 
 /* Chat header */
 .chat .chat-header {
-    padding: 15px 20px 20px; /* top, right/left, bottom */
+    padding: 8px 20px 14px; /* top, right/left, bottom */
     flex: 0 0 auto;
     border-bottom: var(--border);
-    height: 78px;
-    max-height: 78px;
-    cursor: move;
+    height: auto;
+    max-height: none;
+    cursor: default;
     /* overflow-x: auto; */
     /* border: 1px solid lime; */
+}
+
+/* Session time bar at top of chat header */
+.chat-session-time-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 4px 0 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: rgba(255, 255, 255, 0.55);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+    pointer-events: none;
 }
 
 .all-participants-img {
@@ -328,15 +342,29 @@
     z-index: 5;
 }
 
-/* Participants toggle button */
+/* Participants toggle button in header */
 .chat-header-participants-btn {
-    background: rgba(0, 168, 255, 0.15) !important;
-    color: #00a8ff !important;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(0, 168, 255, 0.15);
+    color: #00a8ff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        transform 0.15s ease;
 }
 
 .chat-header-participants-btn:hover {
-    color: #fff !important;
-    background: rgba(0, 168, 255, 0.35) !important;
+    color: #fff;
+    background: rgba(0, 168, 255, 0.35);
+    transform: translateY(-1px);
 }
 
 .chat-header-participants-btn:active {
@@ -348,7 +376,7 @@
     padding: 20px;
     flex: 1 1 auto;
     height: auto;
-    min-height: calc(var(--msger-height) - 240px) !important;
+    min-height: 0;
     max-height: none;
     /* border-bottom: var(--border); */
     overflow-y: auto;
@@ -360,29 +388,13 @@
     padding: 0;
 }
 
-.chat .chat-history ul > li {
+.chat .chat-history ul li {
     list-style: none;
     margin-bottom: 16px;
 }
 
-.chat .chat-history ul > li:last-child {
+.chat .chat-history ul li:last-child {
     margin-bottom: 0px;
-}
-
-.chat .chat-history .message ol,
-.chat .chat-history .message ul {
-    padding-left: 1.5em;
-    margin: 0.5em 0;
-}
-
-.chat .chat-history .message ol li {
-    list-style: decimal;
-    margin-bottom: 4px;
-}
-
-.chat .chat-history .message ul li {
-    list-style: disc;
-    margin-bottom: 4px;
 }
 
 .chat .chat-history .message-data {
@@ -411,7 +423,6 @@
     padding: 12px 16px;
     line-height: 1.5;
     font-size: 14px;
-    min-width: 80px;
     max-width: 100%;
     border-radius: 16px;
     backdrop-filter: blur(8px);
@@ -430,7 +441,7 @@
 .chat .chat-history .my-message {
     background: linear-gradient(135deg, #1e3a5f, #1a2d47);
     border: 1px solid rgba(59, 130, 246, 0.15);
-    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 4px;
 }
 
 .chat .chat-history .my-message:after {
@@ -441,7 +452,7 @@
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.06);
     text-align: left;
-    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
 }
 
 .chat .chat-history .other-message:after {
@@ -469,7 +480,33 @@
     gap: 8px;
 }
 
+/* Replying-in indicator */
+.chat-replying-in {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px 8px;
+}
+
+.chat-replying-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.chat-replying-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+}
+
 .chat-char-count {
+    margin-left: auto;
     font-size: 11px;
     color: rgba(255, 255, 255, 0.35);
     font-variant-numeric: tabular-nums;
@@ -477,9 +514,6 @@
 
 /* Input hint text */
 .chat-toolbar-hint {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     padding: 0 4px;
 }
 
@@ -645,7 +679,7 @@
     z-index: 0;
     position: absolute;
     left: 5px;
-    bottom: 160px;
+    bottom: 195px;
     background: var(--body-bg);
     border: var(--border);
     border-radius: 10px;
@@ -730,20 +764,24 @@ input[type='text'] {
     cursor: pointer;
 }
 
-/* legacy fallback – actual styling handled by .chat-list-actions context above */
 #chatShareRoomBtn {
-    transition: all 0.2s ease;
+    padding: 8px 16px;
+    background: var(--body-bg);
+    border-radius: 10px;
+    /* border: var(--border); */
+    transition: all 0.3s ease-in-out;
 }
 
 #chatShareRoomBtn:hover {
-    transform: none;
+    background: var(--select-bg);
+    transform: translateY(-3px);
 }
 
 .people-list .input-group {
     display: flex;
     align-items: center;
     gap: 0;
-    margin-top: 0;
+    margin-top: 16px;
     padding: 4px;
     border-radius: 10px;
     background: color-mix(in srgb, var(--body-bg) 82%, transparent);
@@ -818,154 +856,4 @@ input[type='text'] {
         padding: 10px 12px;
         font-size: 13px;
     }
-}
-
-/* AI Typing Indicator */
-.ai-typing-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    margin: 8px 0;
-    float: left;
-    clear: both;
-}
-
-.ai-typing-indicator .typing-dots {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    padding: 12px 18px;
-    backdrop-filter: blur(8px);
-}
-
-.ai-typing-indicator .typing-dots span {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
-    animation: typingBounce 1.4s infinite ease-in-out both;
-}
-
-.ai-typing-indicator .typing-dots span:nth-child(1) {
-    animation-delay: -0.32s;
-}
-
-.ai-typing-indicator .typing-dots span:nth-child(2) {
-    animation-delay: -0.16s;
-}
-
-.ai-typing-indicator .typing-dots span:nth-child(3) {
-    animation-delay: 0s;
-}
-
-@keyframes typingBounce {
-    0%,
-    80%,
-    100% {
-        transform: scale(0.6);
-        opacity: 0.4;
-    }
-    40% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
-/* Message reaction badges */
-.message-reactions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
-    min-height: 0;
-}
-
-.reaction-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-size: 13px;
-    cursor: pointer;
-    position: relative;
-    transition:
-        background 0.2s ease,
-        border-color 0.2s ease;
-}
-
-.reaction-badge:hover {
-    background: rgba(255, 255, 255, 0.18);
-}
-
-.reaction-badge.my-reaction {
-    background: rgba(99, 179, 237, 0.22);
-    border-color: rgba(99, 179, 237, 0.55);
-}
-
-.reaction-badge.my-reaction:hover {
-    background: rgba(99, 179, 237, 0.32);
-}
-
-/* Tooltip showing reacting users on hover */
-.reaction-badge[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.85);
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 6px;
-    white-space: nowrap;
-    font-size: 11px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    z-index: 1000;
-}
-
-.reaction-badge[data-tooltip]:hover::after {
-    opacity: 1;
-}
-
-.reaction-count {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 600;
-}
-
-/* Reaction emoji picker */
-.reaction-picker {
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 6px;
-    padding: 6px 8px;
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    backdrop-filter: blur(8px);
-}
-
-.reaction-emoji-btn {
-    font-size: 18px;
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 6px;
-    transition:
-        transform 0.15s ease,
-        background 0.15s ease;
-    user-select: none;
-}
-
-.reaction-emoji-btn:hover {
-    transform: scale(1.3);
-    background: rgba(255, 255, 255, 0.1);
 }

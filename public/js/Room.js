@@ -11,7 +11,7 @@ if (location.href.substr(0, 5) !== 'https') location.href = 'https' + location.h
  * @license For commercial or closed source, contact us at license.mirotalk@gmail.com or purchase directly via CodeCanyon
  * @license CodeCanyon: https://codecanyon.net/item/mirotalk-sfu-webrtc-realtime-video-conferences/40769970
  * @author  Miroslav Pejic - miroslav.pejic.85@gmail.com
- * @version 2.2.75
+ * @version 2.2.10
  *
  */
 
@@ -241,7 +241,6 @@ const isMediaStreamTrackAndTransformerSupported = virtualBackground.checkSupport
 // ####################################################
 
 let preventExit = false;
-let bypassBeforeUnloadOnce = false;
 
 let virtualBackgroundBlurLevel;
 let virtualBackgroundSelectedImage;
@@ -260,11 +259,6 @@ let room_password = getRoomPassword();
 let room_duration = getRoomDuration();
 let peer_name = getPeerName();
 let peer_avatar = getPeerAvatar();
-let hasTemporaryAvatar = !!(
-    peer_avatar &&
-    localStorageSettings.peer_avatar &&
-    peer_avatar === localStorageSettings.peer_avatar
-);
 let peer_uuid = getPeerUUID();
 let peer_token = getPeerToken();
 let isScreenAllowed = getScreen();
@@ -309,7 +303,6 @@ let video = false;
 let screen = false;
 let hand = false;
 let camera = 'user';
-let sessionVideoMirror = true;
 
 let recTimer = null;
 let recElapsedTime = null;
@@ -440,7 +433,9 @@ async function initClient() {
         setTippy('switchKeepAwake', 'Prevent the device from sleeping (if supported)', 'right');
         setTippy('switchChatPin', 'Auto pin chat when opened', 'right');
         setTippy('roomId', 'Room name (click to copy)', 'right');
-        setTippy('sessionTime', 'Session time', 'right');
+        setTippy('sessionTime', 'Session time', 'bottom');
+        setTippy('chatSessionTime', 'Session time', 'bottom');
+        setTippy('settingsSessionTime', 'Session time', 'right');
         setTippy('recordingImage', 'Toggle recording', 'right');
         setTippy(
             'switchHostOnlyRecording',
@@ -799,7 +794,6 @@ function setupInitButtons() {
     };
     initVideoMirrorButton.onclick = () => {
         initVideo.classList.toggle('mirror');
-        sessionVideoMirror = initVideo.classList.contains('mirror');
     };
     initVirtualBackgroundButton.onclick = () => {
         showImageSelector();
@@ -1003,14 +997,8 @@ function generateRandomName() {
 function getPeerAvatar() {
     const avatar = getQueryParam('avatar');
     const avatarDisabled = avatar === '0' || avatar === 'false';
-    const isBase64Avatar = typeof avatar === 'string' && avatar.startsWith('data:');
     console.log('Direct join', { avatar: avatar });
-    if (avatarDisabled || isBase64Avatar || !isValidAvatarURL(avatar)) {
-        const saved = localStorageSettings.peer_avatar;
-        if (saved && isValidAvatarURL(saved)) {
-            console.log('Restored avatar from localStorage', { avatar: saved });
-            return saved;
-        }
+    if (avatarDisabled || !isImageURL(avatar)) {
         return false;
     }
     return avatar;
@@ -1178,34 +1166,10 @@ function getInfo() {
             os: filterUnknown(parserResult.os),
         };
 
-        const sectionMeta = {
-            browser: { iconMarkup: icons.infoBrowser, label: 'Browser' },
-            cpu: { iconMarkup: icons.infoCpu, label: 'CPU info' },
-            device: { iconMarkup: icons.infoDevice, label: 'Device' },
-            engine: { iconMarkup: icons.infoEngine, label: 'Engine' },
-            os: { iconMarkup: icons.infoOs, label: 'OS info' },
-        };
+        // Convert the filtered result to a readable JSON string
+        const resultString = JSON.stringify(filteredResult, null, 2);
 
-        const rows = Object.entries(filteredResult)
-            .filter(([, data]) => Object.keys(data).length > 0)
-            .map(([section, data]) => {
-                const { iconMarkup, label } = sectionMeta[section] || {
-                    iconMarkup: icons.infoDefault,
-                    label: section,
-                };
-                const badges = Object.entries(data)
-                    .filter(([key]) => key !== 'major')
-                    .map(([, val]) => renderRoomTemplate('extraInfoBadgeTemplate', { text: { value: String(val) } }))
-                    .join('');
-                return renderRoomTemplate('extraInfoRowTemplate', {
-                    text: { label },
-                    html: { iconMarkup, badges },
-                    attrs: { rowClass: `extra-info-row extra-info-row--${section}` },
-                });
-            })
-            .join('');
-
-        extraInfo.innerHTML = renderRoomTemplate('extraInfoGridTemplate', { html: { rows } });
+        extraInfo.innerText = resultString;
 
         return parserResult;
     } catch (error) {
@@ -1601,11 +1565,14 @@ async function shareRoom(useNavigator = false) {
             background: swalBackground,
             position: 'center',
             title: 'Share the room',
-            html: renderRoomTemplate('popupShareRoomTemplate', {
-                text: {
-                    roomUrl: RoomURL,
-                },
-            }),
+            html: `
+            <div id="qrRoomContainer">
+                <canvas id="qrRoom"></canvas>
+            </div>
+            <br/>
+            <p style="background:transparent; color:rgb(8, 189, 89);">Join from your mobile device</p>
+            <p style="background:transparent; color:white; font-family: Arial, Helvetica, sans-serif;">No need for apps, simply capture the QR code with your mobile camera Or Invite someone else to join by sending them the following URL</p>
+            <p style="background:transparent; color:rgb(8, 189, 89);">${RoomURL}</p>`,
             showDenyButton: true,
             showCancelButton: true,
             cancelButtonColor: 'red',
@@ -1686,42 +1653,29 @@ function shareRoomByEmail() {
         imageUrl: image.email,
         position: 'center',
         title: 'Select a Date and Time',
-        html: renderRoomTemplate('popupDateTimePickerTemplate'),
+        html: '<input type="text" id="datetimePicker" class="flatpickr" />',
         showCancelButton: true,
         confirmButtonText: 'OK',
         cancelButtonColor: 'red',
         showClass: { popup: 'animate__animated animate__fadeInDown' },
         hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        didOpen: () => {
-            flatpickr('#datetimePicker', {
-                enableTime: true,
-                dateFormat: 'Y-m-d H:i',
-                time_24hr: true,
-            });
-        },
         preConfirm: () => {
-            const selectedDateTime = Swal.getPopup()?.querySelector('#datetimePicker')?.value?.trim() || '';
-
-            if (!selectedDateTime) {
-                Swal.showValidationMessage('Please select a date and time');
-                return false;
-            }
-
-            const newLine = '\r\n\r\n';
+            const newLine = '%0D%0A%0D%0A';
+            const selectedDateTime = document.getElementById('datetimePicker').value;
             const roomPassword =
                 isRoomLocked && (room_password || rc.RoomPassword)
                     ? 'Password: ' + (room_password || rc.RoomPassword) + newLine
                     : '';
+            const email = '';
             const emailSubject = `Please join our ${BRAND.app.name} Video Chat Meeting`;
-            const emailBody = `The meeting is scheduled at:${newLine}DateTime: ${selectedDateTime}${newLine}${roomPassword}Click to join: ${RoomURL}${newLine}`;
-            const mailtoUrl = `mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-
-            bypassBeforeUnloadOnce = true;
-            setTimeout(() => {
-                bypassBeforeUnloadOnce = false;
-            }, 1500);
-            window.location.href = mailtoUrl;
+            const emailBody = `The meeting is scheduled at: ${newLine} DateTime: ${selectedDateTime} ${newLine}${roomPassword}Click to join: ${RoomURL} ${newLine}`;
+            document.location = 'mailto:' + email + '?subject=' + emailSubject + '&body=' + emailBody;
         },
+    });
+    flatpickr('#datetimePicker', {
+        enableTime: true,
+        dateFormat: 'Y-m-d H:i',
+        time_24hr: true,
     });
 }
 
@@ -1765,7 +1719,7 @@ function roomIsReady() {
 
     makeRoomPopupQR();
 
-    if (peer_avatar && isValidAvatarURL(peer_avatar)) {
+    if (peer_avatar && isImageURL(peer_avatar)) {
         myProfileAvatar.setAttribute('src', peer_avatar);
     } else if (rc.isValidEmail(peer_name)) {
         myProfileAvatar.style.borderRadius = `50px`;
@@ -1773,8 +1727,6 @@ function roomIsReady() {
     } else {
         myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
     }
-
-    updateMyAvatarResetButtonVisibility();
 
     BUTTONS.main.exitButton && show(exitButton);
     BUTTONS.main.shareButton && show(shareButton);
@@ -1840,8 +1792,8 @@ function roomIsReady() {
         //rc.makeDraggable(editorRoom, editorHeader);
         rc.makeDraggable(mySettings, mySettingsHeader);
         rc.makeDraggable(whiteboard, whiteboardHeader);
-        rc.makeDraggable(sendFileDiv, sendFileDragHandle);
-        rc.makeDraggable(receiveFileDiv, receiveFileDragHandle);
+        rc.makeDraggable(sendFileDiv, imgShareSend);
+        rc.makeDraggable(receiveFileDiv, imgShareReceive);
         rc.makeDraggable(lobby, lobbyHeader);
         rc.makeDraggable(transcriptionRoom, transcriptionHeader);
         rc.makeDraggable(breakoutToolbar, breakoutToolbarHandle);
@@ -1927,186 +1879,8 @@ function roomIsReady() {
 }
 
 // ####################################################
-// PROFILE AVATAR URL
-// ####################################################
-
-async function updateMyPeerAvatarByUrl() {
-    const result = await Swal.fire({
-        background: swalBackground,
-        title: 'Set avatar URL',
-        input: 'url',
-        inputLabel: 'Public image URL',
-        inputPlaceholder: 'https://example.com/avatar.jpg',
-        confirmButtonText: 'Apply',
-        showCancelButton: true,
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        inputValidator: (value) => {
-            if (!value) return 'Please enter an image URL';
-            if (value.startsWith('data:')) return 'Base64 avatars are not supported';
-            if (!isValidAvatarURL(value)) return 'Only http/https URLs are supported';
-            return null;
-        },
-        preConfirm: (url) =>
-            new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve(url);
-                img.onerror = () => {
-                    Swal.showValidationMessage(
-                        'Could not load the image, the URL may be invalid, restricted, or not an image'
-                    );
-                    resolve(false);
-                };
-                img.src = url;
-            }),
-        didOpen: () => {
-            const input = document.querySelector('.swal2-input');
-            if (!input) return;
-
-            // Preview image
-            const preview = document.createElement('img');
-            preview.style.cssText =
-                'display:none;width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #4caf50;margin:8px auto 4px;';
-            input.parentNode.insertBefore(preview, input);
-
-            function updatePreview(url) {
-                if (!url) {
-                    preview.style.display = 'none';
-                    return;
-                }
-                preview.src = url;
-                preview.style.display = 'block';
-            }
-
-            input.addEventListener('input', () => updatePreview(input.value.trim()));
-
-            function makeAvatarImg(url) {
-                const img = document.createElement('img');
-                img.src = url;
-                img.title = 'Click to use this avatar';
-                img.style.cssText =
-                    'width:48px;height:48px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;object-fit:cover;background:#222;flex-shrink:0;';
-                img.addEventListener('mouseover', () => (img.style.borderColor = '#4caf50'));
-                img.addEventListener('mouseout', () => (img.style.borderColor = 'transparent'));
-                img.addEventListener('click', () => {
-                    input.value = url;
-                    input.dispatchEvent(new Event('input'));
-                    updatePreview(url);
-                });
-                return img;
-            }
-
-            // Self-hosted avatars
-            const localLabel = document.createElement('p');
-            localLabel.textContent = 'Pick an avatar:';
-            localLabel.style.cssText = 'color:#aaa;font-size:12px;margin:10px 0 6px;text-align:center;';
-
-            const localGrid = document.createElement('div');
-            localGrid.style.cssText =
-                'display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-height:120px;overflow-y:scroll;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:4px 2px;margin-bottom:4px;';
-            localGrid.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
-
-            for (let i = 1; i <= 25; i++) {
-                const url = `${window.location.origin}/images/avatars/avatar_${String(i).padStart(2, '0')}.png`;
-                localGrid.appendChild(makeAvatarImg(url));
-            }
-
-            // DiceBear random avatars
-            const randomAvatarLabel = document.createElement('p');
-            randomAvatarLabel.textContent = 'Or pick a random avatar:';
-            randomAvatarLabel.style.cssText = 'color:#aaa;font-size:12px;margin:10px 0 6px;text-align:center;';
-
-            const randomAvatarGrid = document.createElement('div');
-            randomAvatarGrid.style.cssText =
-                'display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:4px;';
-            const dicebearStyles = [
-                'bottts-neutral',
-                'adventurer-neutral',
-                'thumbs',
-                'initials',
-                'identicon',
-                'shapes',
-            ];
-
-            for (let i = 0; i < 6; i++) {
-                const seed = Math.random().toString(36).substring(2, 10);
-                const style = dicebearStyles[i % dicebearStyles.length];
-                const url = `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
-                randomAvatarGrid.appendChild(makeAvatarImg(url));
-            }
-
-            let insertAfter = input;
-            for (const el of [localLabel, localGrid, randomAvatarLabel, randomAvatarGrid]) {
-                insertAfter.parentNode.insertBefore(el, insertAfter.nextSibling);
-                insertAfter = el;
-            }
-        },
-    });
-
-    if (!result.isConfirmed || !result.value) return;
-
-    applyPeerAvatar(result.value);
-}
-
-function applyPeerAvatar(avatarSrc) {
-    try {
-        peer_avatar = avatarSrc;
-        hasTemporaryAvatar = true;
-
-        localStorageSettings.peer_avatar = peer_avatar;
-        lS.setSettings(localStorageSettings);
-
-        myProfileAvatar.setAttribute('src', peer_avatar);
-        rc.setVideoAvatarImgName(rc.peer_id + '__img', peer_name, peer_avatar);
-        rc.setMsgAvatar('left', peer_name, peer_avatar);
-        updateMyAvatarResetButtonVisibility();
-
-        rc.peer_avatar = peer_avatar;
-        rc.peer_info.peer_avatar = peer_avatar;
-        rc.updatePeerInfo(peer_name, rc.peer_id, 'avatar', peer_avatar);
-
-        userLog('info', 'Avatar applied and saved for future sessions');
-    } catch (err) {
-        console.error('Failed to set avatar URL', err);
-        userLog('error', 'Unable to apply avatar URL');
-    }
-}
-
-function resetMyPeerAvatarInMemory() {
-    peer_avatar = false;
-    hasTemporaryAvatar = false;
-    localStorageSettings.peer_avatar = '';
-    lS.setSettings(localStorageSettings);
-
-    if (rc.isValidEmail(peer_name)) {
-        myProfileAvatar.style.borderRadius = '50px';
-        myProfileAvatar.setAttribute('src', rc.genGravatar(peer_name));
-    } else {
-        myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
-    }
-
-    rc.setVideoAvatarImgName(rc.peer_id + '__img', peer_name, false);
-    rc.setMsgAvatar('left', peer_name, false);
-    updateMyAvatarResetButtonVisibility();
-
-    rc.peer_avatar = false;
-    rc.peer_info.peer_avatar = false;
-    rc.updatePeerInfo(peer_name, rc.peer_id, 'avatar', false);
-
-    userLog('info', 'Avatar reset to default');
-}
-
-function updateMyAvatarResetButtonVisibility() {
-    if (!myProfileAvatarResetBtn) return;
-    myProfileAvatarResetBtn.classList.toggle('hidden', !hasTemporaryAvatar);
-    if (myProfileAvatarUploadBtn) myProfileAvatarUploadBtn.classList.toggle('hidden', hasTemporaryAvatar);
-}
-
-// ####################################################
 // UTILS
 // ####################################################
-
-// renderRoomTemplate is defined in RoomTemplate.js
 
 function updateChatConversationsCount() {
     const el = getId('chatConversationsCount');
@@ -2200,13 +1974,24 @@ function elementNotFound(element) {
 // ####################################################
 
 function startSessionTimer() {
-    sessionTime.style.display = 'inline';
+    const sessionTime = document.getElementById('sessionTime');
+    const chatSessionTime = document.getElementById('chatSessionTime');
+    const settingsSessionTime = document.getElementById('settingsSessionTime');
+    
+    if (sessionTime) sessionTime.style.display = 'inline';
+    
     let callStartTime = Date.now();
     let callElapsedSecondsTime = 0;
     setInterval(function printTime() {
         callElapsedSecondsTime++;
         let callElapsedTime = Date.now() - callStartTime;
-        sessionTime.innerText = getTimeToString(callElapsedTime);
+        const timeString = getTimeToString(callElapsedTime);
+        
+        // Update all timer displays
+        if (sessionTime) sessionTime.innerText = timeString;
+        if (chatSessionTime) chatSessionTime.innerText = timeString;
+        if (settingsSessionTime) settingsSessionTime.innerText = timeString;
+        
         const myCurrentSessionTime = document.querySelector('.current-session-time.notranslate');
         if (myCurrentSessionTime) myCurrentSessionTime.innerText = secondsToHms(callElapsedSecondsTime);
     }, 1000);
@@ -2319,12 +2104,6 @@ function handleButtons() {
     };
     mySettingsCloseBtn.onclick = () => {
         rc.toggleMySettings();
-    };
-    myProfileAvatarUploadBtn.onclick = async () => {
-        await updateMyPeerAvatarByUrl();
-    };
-    myProfileAvatarResetBtn.onclick = () => {
-        resetMyPeerAvatarInMemory();
     };
     tabVideoDevicesBtn.onclick = (e) => {
         rc.openTab(e, 'tabVideoDevices');
@@ -3152,13 +2931,9 @@ async function toggleScreenSharing() {
 }
 
 function handleCameraMirror(video) {
-    // Keep rear camera unmirrored and apply current session preference to front camera only.
-    if (camera === 'environment') {
-        video.classList.remove('mirror');
-        return;
-    }
-
-    video.classList.toggle('mirror', !!sessionVideoMirror);
+    camera === 'environment'
+        ? video.classList.remove('mirror') // Back camera → No mirror
+        : video.classList.add('mirror'); // Disable mirror for rear camera
 }
 
 function handleSelects() {
@@ -3501,14 +3276,6 @@ function handleSelects() {
         rc.updateRoomModerator({ type: 'media_cant_sharing', status: mediaCantSharing });
         rc.roomMessage('media_cant_sharing', mediaCantSharing);
         localStorageSettings.moderator_media_cant_sharing = mediaCantSharing;
-        lS.setSettings(localStorageSettings);
-        e.target.blur();
-    };
-    switchEveryoneCantPolls.onchange = (e) => {
-        const pollsCantCreate = e.currentTarget.checked;
-        rc.updateRoomModerator({ type: 'polls_cant_create', status: pollsCantCreate });
-        rc.roomMessage('polls_cant_create', pollsCantCreate);
-        localStorageSettings.moderator_polls_cant_create = pollsCantCreate;
         lS.setSettings(localStorageSettings);
         e.target.blur();
     };
@@ -4612,16 +4379,6 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
-function isValidAvatarURL(url) {
-    if (!url || typeof url !== 'string') return false;
-    try {
-        const parsed = new URL(url);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-        return false;
-    }
-}
-
 async function isImageURL(url) {
     if (!url) return false;
     try {
@@ -5451,7 +5208,25 @@ function createStickyNote() {
     Swal.fire({
         background: swalBackground,
         title: 'Create Sticky Note',
-        html: renderRoomTemplate('popupStickyNoteTemplate'),
+        html: `
+        <div class="sticky-note-form">
+            <textarea id="stickyNoteText" class="sticky-note-textarea" rows="4" placeholder="Type your note here...">Note</textarea>
+            <div class="sticky-note-colors-row">
+                <div class="sticky-note-color-group">
+                    <label for="stickyNoteColor" class="sticky-note-color-label">
+                        <i class="fas fa-palette"></i> Background
+                    </label>
+                    <input id="stickyNoteColor" type="color" value="#FFEB3B" class="sticky-note-color-input">
+                </div>
+                <div class="sticky-note-color-group">
+                    <label for="stickyNoteTextColor" class="sticky-note-color-label">
+                        <i class="fas fa-font"></i> Text
+                    </label>
+                    <input id="stickyNoteTextColor" type="color" value="#000000" class="sticky-note-color-input">
+                </div>
+            </div>
+        </div>
+        `,
         showCancelButton: true,
         confirmButtonText: 'Create',
         cancelButtonText: 'Cancel',
@@ -5541,7 +5316,11 @@ function setupFileSelection(title, accept, renderToCanvas) {
         position: 'center',
         title: title,
         input: 'file',
-        html: renderRoomTemplate('popupFileDropTemplate'),
+        html: `
+        <div id="dropArea">
+            <p>Drag and drop your file here</p>
+        </div>
+        `,
         inputAttributes: {
             accept: accept,
             'aria-label': title,
@@ -6157,87 +5936,29 @@ async function getRoomParticipants() {
 function getParticipantsList(peers) {
     let li = '';
 
-    function renderParticipantStatus(statusText) {
-        return renderRoomTemplate('participantListStatusTemplate', {
-            text: { statusText },
-        });
-    }
-
-    function renderParticipantActionButton({ buttonClass = 'ml5', buttonId, onClick, iconHtml, label = '' }) {
-        return renderRoomTemplate('participantListActionButtonTemplate', {
-            text: { label },
-            html: { iconHtml },
-            attrs: {
-                buttonClass,
-                buttonId,
-                onClick,
-            },
-        });
-    }
-
-    function renderParticipantMenuItem(buttonHtml) {
-        return renderRoomTemplate('participantListMenuItemTemplate', {
-            html: { buttonHtml },
-        });
-    }
-
-    function renderParticipantDropdown(menuId, menuItems) {
-        return renderRoomTemplate('participantListDropdownTemplate', {
-            html: { menuItems },
-            attrs: { menuId },
-        });
-    }
-
-    function renderParticipantButtons(buttons) {
-        return renderRoomTemplate('participantListActionButtonsTemplate', {
-            html: { buttons },
-        });
-    }
-
-    function renderParticipantItem({
-        itemId,
-        toId,
-        toName,
-        itemClass,
-        onClick,
-        avatarSrc,
-        name,
-        nameSuffix = '',
-        statusHtml,
-        dropdownHtml = '',
-        buttonsHtml = '',
-    }) {
-        return renderRoomTemplate('participantListItemTemplate', {
-            text: { name },
-            html: { nameSuffix, statusHtml, dropdownHtml, buttonsHtml },
-            attrs: {
-                itemId,
-                toId,
-                toName,
-                itemClass,
-                onClick,
-                avatarSrc,
-            },
-        });
-    }
-
     const chatGPT = BUTTONS.chat.chatGPT !== undefined ? BUTTONS.chat.chatGPT : true;
 
     // CHAT-GPT
     if (chatGPT) {
         const chatgpt_active = rc.chatPeerName === 'ChatGPT' ? ' active' : '';
 
-        li = renderParticipantItem({
-            itemId: 'ChatGPT',
-            toId: 'ChatGPT',
-            toName: 'ChatGPT',
-            itemClass: `clearfix${chatgpt_active}`,
-            onClick: "rc.showPeerAboutAndMessages(this.id, 'ChatGPT', '', event)",
-            avatarSrc: image.chatgpt,
-            name: 'ChatGPT',
-            nameSuffix: ' <span class="chat-peer-badge assistant-green">Assistant</span>',
-            statusHtml: renderParticipantStatus('Private assistant replies'),
-        });
+        li = `
+        <li 
+            id="ChatGPT" 
+            data-to-id="ChatGPT"
+            data-to-name="ChatGPT"
+            class="clearfix${chatgpt_active}" 
+            onclick="rc.showPeerAboutAndMessages(this.id, 'ChatGPT', '', event)"
+        >
+            <img 
+                src="${image.chatgpt}"
+                alt="avatar"
+            />
+            <div class="about">
+                <div class="name">ChatGPT <span class="chat-peer-badge assistant-green">Assistant</span></div>
+                <span class="chat-peer-status-text"><i class="fa fa-circle online"></i> Private assistant replies</span>
+            </div>
+        </li>`;
     }
 
     const deepSeek = BUTTONS.chat.deepSeek !== undefined ? BUTTONS.chat.deepSeek : true;
@@ -6246,121 +5967,89 @@ function getParticipantsList(peers) {
     if (deepSeek) {
         const deepSeek_active = rc.chatPeerName === 'DeepSeek' ? ' active' : '';
 
-        li += renderParticipantItem({
-            itemId: 'DeepSeek',
-            toId: 'DeepSeek',
-            toName: 'DeepSeek',
-            itemClass: `clearfix${deepSeek_active}`,
-            onClick: "rc.showPeerAboutAndMessages(this.id, 'DeepSeek', '', event)",
-            avatarSrc: image.deepSeek,
-            name: 'DeepSeek',
-            nameSuffix: ' <span class="chat-peer-badge assistant">Assistant</span>',
-            statusHtml: renderParticipantStatus('Private assistant replies'),
-        });
+        li += `
+        <li 
+            id="DeepSeek" 
+            data-to-id="DeepSeek"
+            data-to-name="DeepSeek"
+            class="clearfix${deepSeek_active}" 
+            onclick="rc.showPeerAboutAndMessages(this.id, 'DeepSeek', '', event)"
+        >
+            <img 
+                src="${image.deepSeek}"
+                alt="avatar"
+            />
+            <div class="about">
+                <div class="name">DeepSeek <span class="chat-peer-badge assistant">Assistant</span></div>
+                <span class="chat-peer-status-text"><i class="fa fa-circle online"></i> Private assistant replies</span>
+            </div>
+        </li>`;
     }
 
     const public_chat_active = rc.chatPeerName === 'all' ? ' active' : '';
 
     // ALL
-    let publicDropdownHtml = '';
-    let publicButtonsHtml = '';
+    li += `
+    <li id="all"
+        data-to-id="all"
+        data-to-name="all"
+        class="clearfix${public_chat_active}" 
+        onclick="rc.showPeerAboutAndMessages(this.id, 'all', '', event)"
+    >
+        <img 
+            src="${image.all}"
+            alt="avatar"
+        />
+        <div class="about">
+            <div class="name">Public chat <span id="all-unread-count" class="unread-count hidden"></span></div>
+            <span class="chat-peer-status-text"><i class="fa fa-circle online"></i> Everyone in room ${participantsCount}</span>
+        </div>`;
 
     // ONLY PRESENTER CAN EXECUTE THIS CMD
     if (!isRulesActive || isPresenter) {
-        let menuItems = '';
+        li += `
+        <div class="dropdown">
+            <button 
+                class="dropdown-toggle" 
+                type="button" 
+                id="${socket.id}-chatDropDownMenu" 
+                data-bs-toggle="dropdown" 
+                aria-expanded="false"
+                style="float: right"
+            >
+            <i class="fas fa-bars"></i>
+            </button>
+            <ul class="dropdown-menu text-start" aria-labelledby="${socket.id}-chatDropDownMenu">`;
 
-        menuItems += renderParticipantMenuItem(
-            renderParticipantActionButton({
-                buttonId: 'muteAllParticipantsButton',
-                onClick: `rc.peerAction('me','${socket.id}','mute',true,true)`,
-                iconHtml: _PEER.audioOff,
-                label: 'Mute all participants',
-            })
-        );
-        menuItems += renderParticipantMenuItem(
-            renderParticipantActionButton({
-                buttonId: 'hideAllParticipantsButton',
-                onClick: `rc.peerAction('me','${socket.id}','hide',true,true)`,
-                iconHtml: _PEER.videoOff,
-                label: 'Hide all participants',
-            })
-        );
-        menuItems += renderParticipantMenuItem(
-            renderParticipantActionButton({
-                buttonId: 'stopAllParticipantsButton',
-                onClick: `rc.peerAction('me','${socket.id}','stop',true,true)`,
-                iconHtml: _PEER.screenOff,
-                label: 'Stop all screens sharing',
-            })
-        );
+        li += `<li><button class="ml5" id="muteAllParticipantsButton" onclick="rc.peerAction('me','${socket.id}','mute',true,true)">${_PEER.audioOff} Mute all participants</button></li>`;
+        li += `<li><button class="ml5" id="hideAllParticipantsButton" onclick="rc.peerAction('me','${socket.id}','hide',true,true)">${_PEER.videoOff} Hide all participants</button></li>`;
+        li += `<li><button class="ml5" id="stopAllParticipantsButton" onclick="rc.peerAction('me','${socket.id}','stop',true,true)">${_PEER.screenOff} Stop all screens sharing</button></li>`;
 
         if (BUTTONS.participantsList.sendFileAllButton) {
-            menuItems += renderParticipantMenuItem(
-                renderParticipantActionButton({
-                    buttonClass: 'btn-sm ml5',
-                    buttonId: 'sendAllButton',
-                    onClick: `rc.selectFileToShare('${socket.id}', true)`,
-                    iconHtml: _PEER.sendFile,
-                    label: 'Share file to all',
-                })
-            );
+            li += `<li><button class="btn-sm ml5" id="sendAllButton" onclick="rc.selectFileToShare('${socket.id}', true)">${_PEER.sendFile} Share file to all</button></li>`;
         }
 
-        menuItems += renderParticipantMenuItem(
-            renderParticipantActionButton({
-                buttonClass: 'btn-sm ml5',
-                buttonId: 'sendVideoToAll',
-                onClick: `rc.shareVideo('all');`,
-                iconHtml: _PEER.sendVideo,
-                label: 'Share audio/video to all',
-            })
-        );
+        li += `<li><button class="btn-sm ml5" id="sendVideoToAll" onclick="rc.shareVideo('all');">${_PEER.sendVideo} Share audio/video to all</button></li>`;
 
         if (BUTTONS.participantsList.ejectAllButton) {
-            menuItems += renderParticipantMenuItem(
-                renderParticipantActionButton({
-                    buttonClass: 'btn-sm ml5',
-                    buttonId: 'ejectAllButton',
-                    onClick: `rc.peerAction('me','${socket.id}','eject',true,true)`,
-                    iconHtml: _PEER.ejectPeer,
-                    label: 'Eject all participants',
-                })
-            );
+            li += `<li><button class="btn-sm ml5" id="ejectAllButton" onclick="rc.peerAction('me','${socket.id}','eject',true,true)">${_PEER.ejectPeer} Eject all participants</button></li>`;
         }
 
-        publicDropdownHtml = renderParticipantDropdown(`${socket.id}-chatDropDownMenu`, menuItems);
-        publicButtonsHtml = renderParticipantButtons(
-            renderParticipantActionButton({
-                buttonId: 'muteAllButton',
-                onClick: `rc.peerAction('me','${socket.id}','mute',true,true)`,
-                iconHtml: _PEER.audioOff,
-            }) +
-                renderParticipantActionButton({
-                    buttonId: 'hideAllButton',
-                    onClick: `rc.peerAction('me','${socket.id}','hide',true,true)`,
-                    iconHtml: _PEER.videoOff,
-                }) +
-                renderParticipantActionButton({
-                    buttonId: 'stopAllButton',
-                    onClick: `rc.peerAction('me','${socket.id}','stop',true,true)`,
-                    iconHtml: _PEER.screenOff,
-                })
-        );
+        li += `</ul>
+        </div>
+
+        <br/>
+
+        <div class="about-buttons mt5">
+            <button class="ml5" id="muteAllButton" onclick="rc.peerAction('me','${socket.id}','mute',true,true)">${_PEER.audioOff}</button>
+            <button class="ml5" id="hideAllButton" onclick="rc.peerAction('me','${socket.id}','hide',true,true)">${_PEER.videoOff}</button>
+            <button class="ml5" id="stopAllButton" onclick="rc.peerAction('me','${socket.id}','stop',true,true)">${_PEER.screenOff}</button>
+        </div>`;
     }
 
-    li += renderParticipantItem({
-        itemId: 'all',
-        toId: 'all',
-        toName: 'all',
-        itemClass: `clearfix${public_chat_active}`,
-        onClick: "rc.showPeerAboutAndMessages(this.id, 'all', '', event)",
-        avatarSrc: image.all,
-        name: 'Public chat',
-        nameSuffix: ' <span id="all-unread-count" class="unread-count hidden"></span>',
-        statusHtml: renderParticipantStatus(`Everyone in room ${participantsCount}`),
-        dropdownHtml: publicDropdownHtml,
-        buttonsHtml: publicButtonsHtml,
-    });
+    li += `
+    </li>
+    `;
 
     // PEERS IN THE CURRENT ROOM
     for (const peer of Array.from(peers.keys())) {
@@ -6387,191 +6076,146 @@ function getParticipantsList(peers) {
         if (socket.id !== peer_id) {
             // PRESENTER HAS MORE OPTIONS
             if (isRulesActive && isPresenter) {
-                let menuItems = '';
+                li += `
+                <li 
+                    id='${peer_id}'
+                    data-to-id="${peer_id}" 
+                    data-to-name="${peer_name}"
+                    class="clearfix${peer_chat_active}" 
+                    onclick="rc.showPeerAboutAndMessages(this.id, '${peer_name}', '${peer_avatar}', event)"
+                >
+                    <img
+                        src="${avatarImg}"
+                        alt="avatar" 
+                    />
+                    <div class="about">
+                        <div class="name">${peer_name_limited} <i id="${peer_id}-unread-msg" class="fas fa-comments hidden"></i> <span id="${peer_id}-unread-count" class="unread-count hidden"></span></div>
+                        <span class="chat-peer-status-text"><i class="fa fa-circle online"></i> Private messages</span>
+                    </div>
 
-                menuItems += renderParticipantMenuItem(
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pAudioMute`,
-                        onClick: `rc.peerAction('me',this.id,'mute')`,
-                        iconHtml: _PEER.audioOn,
-                        label: 'Toggle audio',
-                    })
-                );
-                menuItems += renderParticipantMenuItem(
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pVideoHide`,
-                        onClick: `rc.peerAction('me',this.id,'hide')`,
-                        iconHtml: _PEER.videoOn,
-                        label: 'Toggle video',
-                    })
-                );
-                menuItems += renderParticipantMenuItem(
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pScreenStop`,
-                        onClick: `rc.peerAction('me',this.id,'stop')`,
-                        iconHtml: _PEER.screenOn,
-                        label: 'Toggle screen',
-                    })
-                );
+                    <div class="dropdown">
+                        <button 
+                            class="dropdown-toggle" 
+                            type="button" 
+                            id="${peer_id}-chatDropDownMenu" 
+                            data-bs-toggle="dropdown" 
+                            aria-expanded="false"
+                            style="float: right"
+                        >
+                        <i class="fas fa-bars"></i>
+                        </button>
+                        <ul class="dropdown-menu text-start" aria-labelledby="${peer_id}-chatDropDownMenu">`;
+
+                li += `<li><button class="ml5" id='${peer_id}___pAudioMute' onclick="rc.peerAction('me',this.id,'mute')">${_PEER.audioOn} Toggle audio</button></li>`;
+                li += `<li><button class="ml5" id='${peer_id}___pVideoHide' onclick="rc.peerAction('me',this.id,'hide')">${_PEER.videoOn} Toggle video</button></li>`;
+                li += `<li><button class="ml5" id='${peer_id}___pScreenStop' onclick="rc.peerAction('me',this.id,'stop')">${_PEER.screenOn} Toggle screen</button></li>`;
 
                 if (BUTTONS.participantsList.sendFileButton) {
-                    menuItems += renderParticipantMenuItem(
-                        renderParticipantActionButton({
-                            buttonClass: 'btn-sm ml5',
-                            buttonId: `${peer_id}___shareFile`,
-                            onClick: `rc.selectFileToShare('${peer_id}', false, ${JSON.stringify(peer_name)})`,
-                            iconHtml: peer_sendFile,
-                            label: 'Share file',
-                        })
-                    );
+                    li += `<li><button class="btn-sm ml5" id='${peer_id}___shareFile' onclick="rc.selectFileToShare('${peer_id}', false, '${peer_name}')">${peer_sendFile} Share file</button></li>`;
                 }
 
-                menuItems += renderParticipantMenuItem(
-                    renderParticipantActionButton({
-                        buttonClass: 'btn-sm ml5',
-                        buttonId: `${peer_id}___sendVideoTo`,
-                        onClick: `rc.shareVideo('${peer_id}', ${JSON.stringify(peer_name)});`,
-                        iconHtml: _PEER.sendVideo,
-                        label: 'Share audio/video',
-                    })
-                );
+                li += `<li><button class="btn-sm ml5" id="${peer_id}___sendVideoTo" onclick="rc.shareVideo('${peer_id}', '${peer_name}');">${_PEER.sendVideo} Share audio/video</button></li>`;
 
                 if (BUTTONS.participantsList.geoLocationButton) {
-                    menuItems += renderParticipantMenuItem(
-                        renderParticipantActionButton({
-                            buttonClass: 'btn-sm ml5',
-                            buttonId: `${peer_id}___geoLocation`,
-                            onClick: `rc.askPeerGeoLocation(this.id)`,
-                            iconHtml: peer_geoLocation,
-                            label: 'Get geolocation',
-                        })
-                    );
+                    li += `<li><button class="btn-sm ml5" id='${peer_id}___geoLocation' onclick="rc.askPeerGeoLocation(this.id)">${peer_geoLocation} Get geolocation</button></li>`;
                 }
                 if (BUTTONS.participantsList.banButton) {
-                    menuItems += renderParticipantMenuItem(
-                        renderParticipantActionButton({
-                            buttonClass: 'btn-sm ml5',
-                            buttonId: `${peer_id}___pBan`,
-                            onClick: `rc.peerAction('me',this.id,'ban')`,
-                            iconHtml: peer_ban,
-                            label: 'Ban participant',
-                        })
-                    );
+                    li += `<li><button class="btn-sm ml5" id='${peer_id}___pBan' onclick="rc.peerAction('me',this.id,'ban')">${peer_ban} Ban participant</button></li>`;
                 }
                 if (BUTTONS.participantsList.ejectButton) {
-                    menuItems += renderParticipantMenuItem(
-                        renderParticipantActionButton({
-                            buttonClass: 'btn-sm ml5',
-                            buttonId: `${peer_id}___pEject`,
-                            onClick: `rc.peerAction('me',this.id,'eject')`,
-                            iconHtml: peer_eject,
-                            label: 'Eject participant',
-                        })
-                    );
+                    li += `<li><button class="btn-sm ml5" id='${peer_id}___pEject' onclick="rc.peerAction('me',this.id,'eject')">${peer_eject} Eject participant</button></li>`;
                 }
-                const dropdownHtml = renderParticipantDropdown(`${peer_id}-chatDropDownMenu`, menuItems);
 
-                let buttons =
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pAudio`,
-                        onClick: `rc.peerAction('me',this.id,'mute')`,
-                        iconHtml: peer_audio,
-                    }) +
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pVideo`,
-                        onClick: `rc.peerAction('me',this.id,'hide')`,
-                        iconHtml: peer_video,
-                    }) +
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pScreen`,
-                        onClick: `rc.peerAction('me',this.id,'stop')`,
-                        iconHtml: peer_screen,
-                    });
+                li += `</ul>
+                    </div>
+
+                    <br/>
+
+                    <div class="about-buttons mt5"> 
+                        <button class="ml5" id='${peer_id}___pAudio' onclick="rc.peerAction('me',this.id,'mute')">${peer_audio}</button>
+                        <button class="ml5" id='${peer_id}___pVideo' onclick="rc.peerAction('me',this.id,'hide')">${peer_video}</button>
+                        <button class="ml5" id='${peer_id}___pScreen' onclick="rc.peerAction('me',this.id,'stop')">${peer_screen}</button>
+                `;
+
+                // li += `
+                //         <button class="ml5" >${peer_presenter}</button>`;
 
                 if (peer_info.peer_hand) {
-                    buttons += renderParticipantActionButton({ iconHtml: peer_hand });
+                    li += `
+                        <button class="ml5" >${peer_hand}</button>`;
                 }
 
-                li += renderParticipantItem({
-                    itemId: peer_id,
-                    toId: peer_id,
-                    toName: peer_name,
-                    itemClass: `clearfix${peer_chat_active}`,
-                    onClick: `rc.showPeerAboutAndMessages(this.id, ${JSON.stringify(peer_name)}, ${JSON.stringify(peer_avatar || '')}, event)`,
-                    avatarSrc: avatarImg,
-                    name: peer_name_limited,
-                    nameSuffix: ` <span id="${peer_id}-unread-count" class="unread-count hidden"></span>`,
-                    statusHtml: renderParticipantStatus('Private messages'),
-                    dropdownHtml,
-                    buttonsHtml: renderParticipantButtons(buttons),
-                });
+                li += ` 
+                    </div>
+                </li>
+                `;
             } else {
                 // GUEST USER
-                let dropdownHtml = '';
+                li += `
+                <li 
+                    id='${peer_id}' 
+                    data-to-id="${peer_id}"
+                    data-to-name="${peer_name}"
+                    class="clearfix${peer_chat_active}" 
+                    onclick="rc.showPeerAboutAndMessages(this.id, '${peer_name}', '${peer_avatar}', event)"
+                >
+                <img 
+                    src="${avatarImg}"
+                    alt="avatar" 
+                />
+                    <div class="about">
+                        <div class="name">${peer_name_limited} <i id="${peer_id}-unread-msg" class="fas fa-comments hidden"></i> <span id="${peer_id}-unread-count" class="unread-count hidden"></span></div>
+                        <span class="chat-peer-status-text"><i class="fa fa-circle online"></i> Private messages</span>
+                    </div>
+                `;
 
                 // NO ROOM BROADCASTING
                 if (!isBroadcastingEnabled) {
-                    let menuItems = '';
+                    li += `
+                    <div class="dropdown">
+                        <button 
+                            class="dropdown-toggle" 
+                            type="button" 
+                            id="${peer_id}-chatDropDownMenu" 
+                            data-bs-toggle="dropdown" 
+                            aria-expanded="false"
+                            style="float: right"
+                        >
+                        <i class="fas fa-bars"></i>
+                        </button>
+                        <ul class="dropdown-menu text-start" aria-labelledby="${peer_id}-chatDropDownMenu">`;
 
                     if (BUTTONS.participantsList.sendFileButton) {
-                        menuItems += renderParticipantMenuItem(
-                            renderParticipantActionButton({
-                                buttonClass: 'btn-sm ml5',
-                                buttonId: `${peer_id}___shareFile`,
-                                onClick: `rc.selectFileToShare('${peer_id}', false, ${JSON.stringify(peer_name)})`,
-                                iconHtml: peer_sendFile,
-                                label: 'Share file',
-                            })
-                        );
+                        li += `<li><button class="btn-sm ml5" id='${peer_id}___shareFile' onclick="rc.selectFileToShare('${peer_id}', false, '${peer_name}')">${peer_sendFile} Share file</button></li>`;
                     }
 
-                    menuItems += renderParticipantMenuItem(
-                        renderParticipantActionButton({
-                            buttonClass: 'btn-sm ml5',
-                            buttonId: `${peer_id}___sendVideoTo`,
-                            onClick: `rc.shareVideo('${peer_id}', ${JSON.stringify(peer_name)});`,
-                            iconHtml: _PEER.sendVideo,
-                            label: 'Share Audio/Video',
-                        })
-                    );
-
-                    dropdownHtml = renderParticipantDropdown(`${peer_id}-chatDropDownMenu`, menuItems);
+                    li += `<li><button class="btn-sm ml5" id="${peer_id}___sendVideoTo" onclick="rc.shareVideo('${peer_id}', '${peer_name}');">${_PEER.sendVideo} Share Audio/Video</button></li>
+                        </ul>
+                    </div>
+                    `;
                 }
 
-                let buttons =
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pAudio`,
-                        onClick: `rc.peerGuestNotAllowed('audio')`,
-                        iconHtml: peer_audio,
-                    }) +
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pVideo`,
-                        onClick: `rc.peerGuestNotAllowed('video')`,
-                        iconHtml: peer_video,
-                    }) +
-                    renderParticipantActionButton({
-                        buttonId: `${peer_id}___pScreen`,
-                        onClick: `rc.peerGuestNotAllowed('screen')`,
-                        iconHtml: peer_screen,
-                    });
+                li += `
+                    <br/>
+
+                    <div class="about-buttons mt5"> 
+                        <button class="ml5" id='${peer_id}___pAudio' onclick="rc.peerGuestNotAllowed('audio')">${peer_audio}</button>
+                        <button class="ml5" id='${peer_id}___pVideo' onclick="rc.peerGuestNotAllowed('video')">${peer_video}</button>
+                        <button class="ml5" id='${peer_id}___pScreen' onclick="rc.peerGuestNotAllowed('screen')">${peer_screen}</button>
+                        `;
+
+                // li += `
+                //         <button class="ml5" >${peer_presenter}</button>`;
 
                 if (peer_info.peer_hand) {
-                    buttons += renderParticipantActionButton({ iconHtml: peer_hand });
+                    li += ` 
+                        <button class="ml5" >${peer_hand}</button>`;
                 }
 
-                li += renderParticipantItem({
-                    itemId: peer_id,
-                    toId: peer_id,
-                    toName: peer_name,
-                    itemClass: `clearfix${peer_chat_active}`,
-                    onClick: `rc.showPeerAboutAndMessages(this.id, ${JSON.stringify(peer_name)}, ${JSON.stringify(peer_avatar || '')}, event)`,
-                    avatarSrc: avatarImg,
-                    name: peer_name_limited,
-                    nameSuffix: ` <span id="${peer_id}-unread-count" class="unread-count hidden"></span>`,
-                    statusHtml: renderParticipantStatus('Private messages'),
-                    dropdownHtml,
-                    buttonsHtml: renderParticipantButtons(buttons),
-                });
+                li += ` 
+                    </div>
+                </li>
+                `;
             }
         }
     }
@@ -6605,7 +6249,7 @@ function refreshParticipantsCount(count, adapt = true) {
 }
 
 function getParticipantAvatar(peerName, peerAvatar = false) {
-    if (peerAvatar && isValidAvatarURL(peerAvatar)) {
+    if (peerAvatar && rc.isImageURL(peerAvatar)) {
         return peerAvatar;
     }
     if (rc.isValidEmail(peerName)) {
@@ -6686,10 +6330,7 @@ function renderDynamicThemeCards() {
         card.className = 'theme-card';
         card.dataset.theme = name;
         card.dataset.index = index;
-        card.innerHTML = renderRoomTemplate('themeCardTemplate', {
-            text: { label: option.textContent },
-            attrs: { iconClass },
-        });
+        card.innerHTML = `<i class="${iconClass}"></i><span>${option.textContent}</span>`;
 
         // Apply dynamic icon color via inline style
         const icon = card.querySelector('i');
@@ -7398,7 +7039,7 @@ window.addEventListener('beforeunload', (e) => {
         rc.saveRecording('User is closing the tab, refreshing, or navigating away');
     }
 
-    if (bypassBeforeUnloadOnce || !preventExit || window.localStorage.isReconnected === 'true') return;
+    if (!preventExit || window.localStorage.isReconnected === 'true') return;
     // Modern browsers ignore custom messages, but this triggers the prompt
     e.preventDefault();
     e.returnValue = '';
@@ -7416,12 +7057,45 @@ function showAbout() {
         position: 'center',
         imageUrl: BRAND.about?.imageUrl && BRAND.about.imageUrl.trim() !== '' ? BRAND.about.imageUrl : image.about,
         customClass: { image: 'img-about' },
-        title: BRAND.about?.title && BRAND.about.title.trim() !== '' ? BRAND.about.title : 'WebRTC SFU v2.2.75',
-        html: renderRoomTemplate('popupAboutTemplate', {
-            html: {
-                aboutContent: BRAND.about.html,
-            },
-        }),
+        title: BRAND.about?.title && BRAND.about.title.trim() !== '' ? BRAND.about.title : 'WebRTC SFU v2.2.10',
+        html: `
+            <br />
+            <div id="about">
+                ${
+                    BRAND.about?.html && BRAND.about.html.trim() !== ''
+                        ? BRAND.about.html
+                        : `
+                            <button 
+                                id="support-button" 
+                                data-umami-event="Support button" 
+                                onclick="window.open('https://codecanyon.net/user/miroslavpejic85', '_blank')">
+                                <i class="fas fa-heart"></i> Support
+                            </button>
+                            <br /><br /><br />
+                            Author: 
+                            <a 
+                                id="linkedin-button" 
+                                data-umami-event="Linkedin button" 
+                                href="https://www.linkedin.com/in/miroslav-pejic-976a07101/" 
+                                target="_blank"> 
+                                Miroslav Pejic
+                            </a>
+                            <br /><br />
+                            Email: 
+                            <a 
+                                id="email-button" 
+                                data-umami-event="Email button" 
+                                href="mailto:miroslav.pejic.85@gmail.com?subject=MiroTalk SFU info"> 
+                                miroslav.pejic.85@gmail.com
+                            </a>
+                            <br /><br />
+                            <hr />
+                            <span>&copy; 2026 MiroTalk SFU, all rights reserved</span>
+                            <hr />
+                        `
+                }
+            </div>
+        `,
         showClass: { popup: 'animate__animated animate__fadeInDown' },
         hideClass: { popup: 'animate__animated animate__fadeOutUp' },
     });
@@ -7533,60 +7207,18 @@ async function deleteAllBreakoutRooms() {
     if (breakoutRooms.length === 0) return;
 
     const breakoutInfo = await getBreakoutRoomsInfo();
-    const activeRoomIds = new Set(breakoutInfo.filter((room) => room.peers > 0).map((room) => room.room));
-    const inactiveRooms = breakoutRooms.filter((room) => !activeRoomIds.has(room.id));
-    const activeRooms = breakoutRooms.filter((room) => activeRoomIds.has(room.id));
-
-    if (inactiveRooms.length === 0) {
+    const hasActivePeers = breakoutInfo.some((r) => r.peers > 0);
+    if (hasActivePeers) {
         return rc.userLog(
             'warning',
-            'No inactive breakout rooms available to delete. Active breakout rooms must be ended first.',
+            'Cannot delete all rooms while participants are still in breakout rooms. Wait for them to return or broadcast a message first.',
             'top-end',
             5000
         );
     }
 
-    const deletingAllRooms = activeRooms.length === 0;
-    const confirmed = await Swal.fire({
-        background: swalBackground,
-        position: 'top',
-        title: deletingAllRooms ? 'Delete All Breakout Rooms?' : 'Delete Inactive Breakout Rooms?',
-        html: `
-            <div class="popup-template-copy popup-template-copy--left">
-                <b>${deletingAllRooms ? 'This will remove every breakout room.' : `This will remove ${inactiveRooms.length} inactive breakout room${inactiveRooms.length !== 1 ? 's' : ''}.`}</b><br /><br />
-                ${
-                    activeRooms.length > 0
-                        ? `${activeRooms.length} active breakout room${activeRooms.length !== 1 ? 's will remain open because participant' : ' will remain open because a participant is'} still inside.`
-                        : 'Participants will no longer be able to join these rooms until you create them again.'
-                }
-            </div>
-        `,
-        showDenyButton: true,
-        confirmButtonText: '<i class="fas fa-trash"></i> Delete',
-        denyButtonText: 'Cancel',
-        customClass: {
-            popup: 'breakout-swal breakout-swal--end',
-            htmlContainer: 'breakout-swal-html',
-            confirmButton: 'breakout-swal-confirm breakout-swal-confirm--end',
-            denyButton: 'breakout-swal-deny',
-        },
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-    });
-
-    if (!confirmed.isConfirmed) return;
-
-    breakoutRooms = activeRooms;
+    breakoutRooms = [];
     refreshBreakoutPanel();
-
-    return rc.userLog(
-        'info',
-        deletingAllRooms
-            ? 'All breakout rooms deleted'
-            : `Deleted ${inactiveRooms.length} inactive breakout room${inactiveRooms.length !== 1 ? 's' : ''}`,
-        'top-end',
-        3000
-    );
 }
 
 async function removeBreakoutRoom(index) {
@@ -7662,28 +7294,26 @@ async function refreshBreakoutPanel() {
         const countId = `breakoutRoomCount-${idx}`;
         const nameId = `breakoutRoomName-${idx}`;
         const durationId = `breakoutRoomDuration-${idx}`;
-        roomsHtml += renderRoomTemplate('breakoutRoomCardTemplate', {
-            text: {
-                displayName,
-                peerCountLabel: `${peerCount} peer${peerCount !== 1 ? 's' : ''}`,
-            },
-            html: {
-                durationDisplay,
-            },
-            attrs: {
-                cardClass: `breakout-room-card${activeClass}`,
-                nameId,
-                nameOnClick: `renameBreakoutRoom(${idx})`,
-                nameTitle: 'Click to rename',
-                countId,
-                durationId,
-                durationOnClick: `editBreakoutDuration(${idx})`,
-                durationTitle: 'Click to change duration',
-                joinOnClick: `presenterJoinBreakoutRoom('${room.id}')`,
-                messageOnClick: `broadcastToBreakoutRooms('${room.id}')`,
-                removeOnClick: `removeBreakoutRoom(${idx})`,
-            },
-        });
+        roomsHtml += `
+            <div class="breakout-room-card${activeClass}">
+                <div class="breakout-room-info">
+                    <i class="fas fa-door-open breakout-accent"></i>
+                    <span class="breakout-room-name" id="${nameId}" onclick="renameBreakoutRoom(${idx})" title="Click to rename">${displayName}</span>
+                    <span class="breakout-room-count" id="${countId}">${peerCount} peer${peerCount !== 1 ? 's' : ''}</span>
+                    <span class="breakout-room-duration" id="${durationId}" onclick="editBreakoutDuration(${idx})" title="Click to change duration">${durationDisplay}</span>
+                </div>
+                <div class="breakout-room-actions">
+                    <button class="breakout-room-join-btn" onclick="presenterJoinBreakoutRoom('${room.id}')">
+                        <i class="fas fa-sign-in-alt"></i> Join
+                    </button>
+                    <button class="breakout-room-msg-btn" onclick="broadcastToBreakoutRooms('${room.id}')" title="Send message to this room">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                    <button class="breakout-room-remove-btn" onclick="removeBreakoutRoom(${idx})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>`;
         if (peerNames.length > 0) {
             const namesHtml = peerNames
                 .map((n) => `<i class="fas fa-user breakout-room-peer-icon"></i>${n}`)
@@ -7711,11 +7341,15 @@ async function refreshBreakoutPanel() {
     hasRooms ? hide(emptyState) : show(emptyState);
     hasRooms ? show(roomsList) : hide(roomsList);
 
-    // Show/hide launch button and header actions
+    // Show/hide launch button and header menu
     const launchBtn = getId('breakoutLaunchBtn');
-    const deleteAllBtn = getId('breakoutDeleteAllBtn');
+    const menuDropdown = getId('breakoutMenuDropdown');
     hasRooms ? show(launchBtn) : hide(launchBtn);
-    hasRooms ? show(deleteAllBtn) : hide(deleteAllBtn);
+    hasRooms ? show(menuDropdown) : hide(menuDropdown);
+
+    // Enable desktop hover for header dropdown
+    const headerDropdown = menuDropdown;
+    if (headerDropdown) handleDropdownHover([headerDropdown]);
 
     // Show/hide actions bar when rooms exist
     const actionsBar = getId('breakoutActionsBar');
@@ -7725,8 +7359,6 @@ async function refreshBreakoutPanel() {
 
     hasRooms ? show(actionsBar) : hide(actionsBar);
     hasActivePeers ? show(endAllBtn) : hide(endAllBtn);
-
-    syncPinnedBreakoutPanelLayout(hasRooms);
 
     broadcastAllBtn.disabled = !hasRooms;
 
@@ -7741,38 +7373,26 @@ async function refreshBreakoutPanel() {
     // Build participants list with room assignment dropdowns
     const bpList = getId('breakoutParticipantsList');
     const roomOptions = breakoutRooms
-        .map((room, idx) =>
-            renderRoomTemplate('breakoutRoomOptionTemplate', {
-                text: { label: room.name || `Room ${idx + 1}` },
-                attrs: { value: room.id },
-            })
-        )
+        .map((room, idx) => `<option value="${room.id}">${room.name || `Room ${idx + 1}`}</option>`)
         .join('');
-    const breakoutParticipantOptions =
-        renderRoomTemplate('breakoutRoomOptionTemplate', {
-            text: { label: 'Not assigned' },
-            attrs: { value: '' },
-        }) + roomOptions;
 
     let participantsHtml = '';
     for (const p of peerList) {
-        participantsHtml += renderRoomTemplate('breakoutParticipantRowTemplate', {
-            text: {
-                peerName: p.name,
-            },
-            html: {
-                roomOptions: breakoutParticipantOptions,
-            },
-            attrs: {
-                avatarSrc: p.avatar,
-                peerId: p.id,
-                peerNameAttr: p.name,
-            },
-        });
+        participantsHtml += `
+            <div class="breakout-participant-row">
+                <div class="breakout-participant-info">
+                    <img src="${p.avatar}" alt="avatar" class="breakout-peer-avatar" />
+                    <span class="breakout-peer-name">${p.name}</span>
+                </div>
+                <select class="breakout-room-select" data-peer-id="${p.id}" data-peer-name="${p.name}">
+                    <option value="">Not assigned</option>
+                    ${roomOptions}
+                </select>
+            </div>`;
     }
 
     if (peerList.length === 0) {
-        participantsHtml = renderRoomTemplate('breakoutNoParticipantsTemplate');
+        participantsHtml = '<div class="breakout-no-participants">No other participants in the room</div>';
     }
     bpList.innerHTML = participantsHtml;
 
@@ -7783,31 +7403,6 @@ async function refreshBreakoutPanel() {
             sel.value = saved;
         }
     });
-}
-
-function syncPinnedBreakoutPanelLayout(hasRooms) {
-    if (!rc || !rc.isBreakoutPinned) return;
-
-    const body = getId('breakoutPanel')?.querySelector('.breakout-panel-body');
-    const sections = document.querySelectorAll('#breakoutPanel .breakout-section');
-    const roomsSection = sections[0];
-
-    if (!body || !roomsSection) return;
-
-    if (hasRooms) {
-        roomsSection.style.display = 'flex';
-        roomsSection.style.flexDirection = 'column';
-        roomsSection.style.minHeight = '0';
-        roomsSection.style.overflow = 'hidden';
-        body.style.gridTemplateRows = 'auto minmax(0, 1fr) auto minmax(0, 1fr)';
-        return;
-    }
-
-    roomsSection.style.display = 'none';
-    roomsSection.style.flexDirection = '';
-    roomsSection.style.minHeight = '';
-    roomsSection.style.overflow = '';
-    body.style.gridTemplateRows = 'auto minmax(220px, 1fr)';
 }
 
 async function launchBreakoutRooms() {
@@ -7837,42 +7432,20 @@ async function launchBreakoutRooms() {
         roomCounts[name] = (roomCounts[name] || 0) + 1;
     });
     const summary = Object.entries(roomCounts)
-        .map(([name, count]) =>
-            renderRoomTemplate('popupBreakoutSummaryRowTemplate', {
-                text: {
-                    roomName: name,
-                    countValue: String(count),
-                },
-                attrs: {
-                    roomIconClass: 'fas fa-door-open',
-                    countIconClass: `fas fa-user${count > 1 ? 's' : ''}`,
-                },
-            })
+        .map(
+            ([name, count]) =>
+                `<i class="fas fa-door-open"></i> ${name}: <i class="fas fa-user${count > 1 ? 's' : ''}"></i> ${count}`
         )
-        .join('');
+        .join('<br>');
 
     const confirmed = await Swal.fire({
         background: swalBackground,
         position: 'top',
-        title: 'Launch Breakout Rooms',
-        html: renderRoomTemplate('popupBreakoutLaunchTemplate', {
-            text: {
-                participantCount: String(assignments.length),
-                participantLabel: `participant${assignments.length !== 1 ? 's' : ''}`,
-            },
-            html: {
-                summary,
-            },
-        }),
+        title: 'Launch Breakout Rooms?',
+        html: `<p style="color:#fff">Move <b>${assignments.length}</b> participant(s) to breakout rooms?</p><p style="color:#b0b0b0;font-size:13px">${summary}</p>`,
         showDenyButton: true,
-        confirmButtonText: '<i class="fas fa-rocket"></i> Launch',
+        confirmButtonText: 'Launch',
         denyButtonText: 'Cancel',
-        customClass: {
-            popup: 'breakout-swal breakout-swal--launch',
-            htmlContainer: 'breakout-swal-html',
-            confirmButton: 'breakout-swal-confirm breakout-swal-confirm--launch',
-            denyButton: 'breakout-swal-deny',
-        },
         showClass: { popup: 'animate__animated animate__fadeInDown' },
         hideClass: { popup: 'animate__animated animate__fadeOutUp' },
     });
@@ -7998,7 +7571,7 @@ function editBreakoutDuration(index) {
         background: swalBackground,
         position: 'center',
         title: 'Set Room Duration',
-        html: renderRoomTemplate('popupBreakoutDurationPickerTemplate'),
+        html: '<div class="breakout-duration-picker-wrapper"><input type="text" id="breakoutDurationPicker" class="breakout-duration-picker-input" /></div>',
         showCancelButton: true,
         showDenyButton: true,
         confirmButtonText: 'Set',
@@ -8095,21 +7668,21 @@ async function endAllBreakoutSessions() {
         background: swalBackground,
         position: 'top',
         title: 'End All Breakout Sessions?',
-        html: renderRoomTemplate('popupBreakoutEndTemplate', {
-            text: {
-                participantCount: String(totalPeers),
-                participantLabel: `participant${totalPeers !== 1 ? 's' : ''}`,
-            },
-        }),
+        html: `
+            <p style="color:#fff">This will notify <b>${totalPeers}</b> participant(s) to return to the main room and remove all rooms.</p>
+            <div class="breakout-countdown-section">
+                <label class="breakout-countdown-label">Countdown before closing:</label>
+                <select id="breakoutEndCountdown" class="form-select text-light bg-dark breakout-countdown-select">
+                    <option value="0">Immediately</option>
+                    <option value="10">10 seconds</option>
+                    <option value="30" selected>30 seconds</option>
+                    <option value="60">60 seconds</option>
+                    <option value="120">2 minutes</option>
+                </select>
+            </div>`,
         showDenyButton: true,
-        confirmButtonText: '<i class="fas fa-door-open"></i> End All',
+        confirmButtonText: 'End All',
         denyButtonText: 'Cancel',
-        customClass: {
-            popup: 'breakout-swal breakout-swal--end',
-            htmlContainer: 'breakout-swal-html',
-            confirmButton: 'breakout-swal-confirm breakout-swal-confirm--end',
-            denyButton: 'breakout-swal-deny',
-        },
         showClass: { popup: 'animate__animated animate__fadeInDown' },
         hideClass: { popup: 'animate__animated animate__fadeOutUp' },
     });
