@@ -204,7 +204,7 @@ access to use this app.
             <span id="breakoutToolbarRoomName" class="breakout-toolbar-room"></span>
         </div>
         <span id="breakoutTimer" class="breakout-toolbar-timer">
-            <i class="fas fa-clock"></i>12 <span id="sessionTime">00:00:00</span>
+            <i class="fas fa-clock"></i> <span id="breakoutTimerDisplay">00:00:00</span>
         </span>
         <button id="breakoutHelpBtn" class="breakout-toolbar-help-btn">
             <i class="fas fa-hand-paper"></i> Ask for Help
@@ -212,6 +212,12 @@ access to use this app.
         <button id="breakoutReturnBtn" class="breakout-toolbar-btn">
             <i class="fas fa-arrow-rotate-left"></i> Return to Main
         </button>
+    </div>
+
+    <!-- ALWAYS VISIBLE SESSION TIMER -->
+    <div id="sessionTimerBar" class="session-timer-bar">
+        <i class="fas fa-clock"></i>
+        <span id="sessionTime">00:00:00</span>
     </div>
 
     <div id="bottomButtons" class="fadein">
@@ -538,7 +544,7 @@ access to use this app.
                             <td>
                                 <div class="title">
                                     <i class="fas fa-clock"></i>
-                                    <p id="sessionTime">00:00:00</p>
+                                    <p id="settingsSessionTime">00:00:00</p>
                                 </div>
                             </td>
                             <td></td>
@@ -1602,8 +1608,7 @@ access to use this app.
                     <!-- SESSION TIME BAR -->
                     <div class="chat-session-time-bar">
                         <i class="fas fa-clock"></i>
-                        s
-                        <span id="sessionTime">00:00:00</span>
+                        <span id="chatSessionTime">00:00:00</span>
                     </div>
                     <div class="w-100">
                         <!-- CHAT ABOUT -->

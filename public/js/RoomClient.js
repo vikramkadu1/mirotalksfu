@@ -5609,8 +5609,11 @@ class RoomClient {
     async toggleChat(fromParticipants = false) {
         if (!fromParticipants && !BUTTONS.main.chatButton) return;
         const chatRoom = this.getId('chatRoom');
-        chatRoom.classList.toggle('show');
+        
+        // Toggle visibility - remove hidden and add show when opening
         if (!this.isChatOpen) {
+            chatRoom.classList.remove('hidden');
+            chatRoom.classList.add('show');
             hide(chatMinButton);
             if (!this.isMobileDevice) {
                 BUTTONS.chat.chatMaxButton && show(chatMaxButton);
@@ -5619,6 +5622,9 @@ class RoomClient {
             this.sound('open');
             // Always show public chat immediately
             this.showPeerAboutAndMessages('all', 'all');
+        } else {
+            chatRoom.classList.remove('show');
+            chatRoom.classList.add('hidden');
         }
         
         this.isChatOpen = !this.isChatOpen;

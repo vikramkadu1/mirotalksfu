@@ -433,7 +433,9 @@ async function initClient() {
         setTippy('switchKeepAwake', 'Prevent the device from sleeping (if supported)', 'right');
         setTippy('switchChatPin', 'Auto pin chat when opened', 'right');
         setTippy('roomId', 'Room name (click to copy)', 'right');
-        setTippy('sessionTime', 'Session time', 'right');
+        setTippy('sessionTime', 'Session time', 'bottom');
+        setTippy('chatSessionTime', 'Session time', 'bottom');
+        setTippy('settingsSessionTime', 'Session time', 'right');
         setTippy('recordingImage', 'Toggle recording', 'right');
         setTippy(
             'switchHostOnlyRecording',
@@ -1972,13 +1974,24 @@ function elementNotFound(element) {
 // ####################################################
 
 function startSessionTimer() {
-    sessionTime.style.display = 'inline';
+    const sessionTime = document.getElementById('sessionTime');
+    const chatSessionTime = document.getElementById('chatSessionTime');
+    const settingsSessionTime = document.getElementById('settingsSessionTime');
+    
+    if (sessionTime) sessionTime.style.display = 'inline';
+    
     let callStartTime = Date.now();
     let callElapsedSecondsTime = 0;
     setInterval(function printTime() {
         callElapsedSecondsTime++;
         let callElapsedTime = Date.now() - callStartTime;
-        sessionTime.innerText = getTimeToString(callElapsedTime);
+        const timeString = getTimeToString(callElapsedTime);
+        
+        // Update all timer displays
+        if (sessionTime) sessionTime.innerText = timeString;
+        if (chatSessionTime) chatSessionTime.innerText = timeString;
+        if (settingsSessionTime) settingsSessionTime.innerText = timeString;
+        
         const myCurrentSessionTime = document.querySelector('.current-session-time.notranslate');
         if (myCurrentSessionTime) myCurrentSessionTime.innerText = secondsToHms(callElapsedSecondsTime);
     }, 1000);
